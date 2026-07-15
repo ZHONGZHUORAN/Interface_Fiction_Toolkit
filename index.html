@@ -422,14 +422,14 @@
 
 /* Account: 首页常驻头像按钮 + 账号面板 */
 .account-btn{ position:relative; flex:0 0 auto; width:40px; height:40px; padding:0; border:1px solid var(--border);
-  border-radius:50%; overflow:hidden; background:#eef0f3; cursor:pointer; display:flex; align-items:center; justify-content:center; }
+  border-radius:50%; overflow:visible; background:#eef0f3; cursor:pointer; display:flex; align-items:center; justify-content:center; }
 .account-btn:hover{ filter:brightness(.97); }
 .account-avatar-img{ width:100%; height:100%; object-fit:cover; display:block; border-radius:50%; }
 .account-initial{ width:100%; height:100%; display:flex; align-items:center; justify-content:center; color:#fff; font-size:16px; font-weight:600; }
-.account-online{ position:absolute; top:1px; right:1px; width:11px; height:11px; border-radius:50%;
-  background:#2ba24a; border:2px solid #fff; box-sizing:border-box; }
-.account-offline-dot{ position:absolute; top:1px; right:1px; width:11px; height:11px; border-radius:50%;
-  background:#b6bcc6; border:2px solid #fff; box-sizing:border-box; }
+.account-online{ position:absolute; top:-2px; right:-2px; width:12px; height:12px; border-radius:50%;
+  background:#2ba24a; border:2px solid #fff; box-sizing:border-box; box-shadow:0 0 0 1px rgba(0,0,0,.06); }
+.account-offline-dot{ position:absolute; top:-2px; right:-2px; width:12px; height:12px; border-radius:50%;
+  background:#b6bcc6; border:2px solid #fff; box-sizing:border-box; box-shadow:0 0 0 1px rgba(0,0,0,.06); }
 .account-person{ width:22px; height:22px; display:block; }
 .account-panel{ min-width:300px; }
 .account-head{ display:flex; align-items:center; gap:14px; margin-bottom:18px; }
@@ -445,8 +445,12 @@
 .account-input{ width:100%; }
 .account-row{ display:flex; gap:10px; align-items:center; }
 .account-row .inp{ flex:1 1 auto; }
+.account-row .btn{ white-space:nowrap; flex:0 0 auto; }
 .account-sync-row{ justify-content:space-between; }
 .account-sync-status{ font-size:14px; color:#1f2329; }
+.account-sync-status-wrap{ display:flex; align-items:center; gap:6px; font-size:14px; color:#1f2329; }
+.account-sync-dot{ width:8px; height:8px; border-radius:50%; background:#2ba24a; flex:0 0 auto; }
+.account-sync-text{ white-space:nowrap; }
 .account-actions{ display:flex; gap:10px; justify-content:flex-end; margin-top:6px; }
 .account-actions .btn{ flex:0 0 auto; }
 .account-pwd-area{ margin-top:6px; }
@@ -2943,7 +2947,8 @@ function getAvatarDataUrl(){
   return (p && p.avatarDataUrl) ? p.avatarDataUrl : null;
 }
 function avatarBgColor(seed){
-  seed = seed || '?';
+  seed = (seed || '').trim();
+  if(!seed) return '#3b82f6';
   let h = 0;
   for(let i=0; i<seed.length; i++){ h = (h*31 + seed.charCodeAt(i)) % 360; }
   return 'hsl(' + h + ', 62%, 52%)';
@@ -2959,10 +2964,12 @@ function accountAvatarNode(size){
   const dataUrl = getAvatarDataUrl();
   if(dataUrl) return el('img', { class: big ? 'account-avatar-lg-img' : 'account-avatar-img', src:dataUrl, alt:'' });
   if(state.userId){
+    const prof = getAccountProfile() || {};
+    const hasCustomName = !!(prof.username && prof.username.trim());
     const name = getDisplayName();
     const ch = (name || '?').trim().charAt(0).toUpperCase() || '?';
     const span = el('span', { class: big ? 'account-initial-lg' : 'account-initial' }, ch);
-    span.style.background = avatarBgColor(name);
+    span.style.background = hasCustomName ? avatarBgColor(name) : '#3b82f6';
     return span;
   }
   return buildPersonSvg(big ? 40 : 22);
@@ -3066,7 +3073,10 @@ function openAccountPanel(){
   const syncWrap = el('div', { class:'account-field' });
   syncWrap.appendChild(el('label', { class:'account-label' }, '同步状态'));
   const syncRow = el('div', { class:'account-row account-sync-row' });
-  const syncStatus = el('span', { class:'account-sync-status' }, syncStatusText());
+  const syncStatus = el('div', { class:'account-sync-status-wrap' });
+  const syncDot = el('span', { class:'account-sync-dot' });
+  const syncText = el('span', { class:'account-sync-text' }, syncStatusText());
+  syncStatus.appendChild(syncDot); syncStatus.appendChild(syncText);
   const syncBtn = el('button', { class:'btn btn-ghost' }, '☁ 立即同步');
   syncBtn.disabled = !state.isOnline || !state.userId;
   syncBtn.addEventListener('click', ()=>{
@@ -3076,7 +3086,7 @@ function openAccountPanel(){
   syncRow.appendChild(syncStatus); syncRow.appendChild(syncBtn);
   syncWrap.appendChild(syncRow);
   body.appendChild(syncWrap);
-  __accountPanelSync = { status: syncStatus, btn: syncBtn };
+  __accountPanelSync = { status: syncText, btn: syncBtn };
 
   /* 修改密码（默认折叠） */
   const pwdArea = el('div', { class:'account-field account-pwd-area', style:'display:none' });
