@@ -1,0 +1,99 @@
+classDiagram
+    class SupabaseClient {
+        <<external:@supabase/supabase-js>>
+        +auth
+        +from(table)
+        +storage
+        +channel(name)
+    }
+    class AuthService {
+        +getSb() SupabaseClient
+        +signUp(email, password) Promise~Session~
+        +signIn(email, password) Promise~Session~
+        +signOut() Promise~void~
+        +getSession() Promise~Session|null~
+        +getUser() Promise~user|null~
+        +onAuthStateChange(cb) unsubscribe
+        +resetPassword(email) Promise~void~
+    }
+    class CloudProject {
+        <<DB: projects>>
+        +id text
+        +owner_id uuid
+        +type text
+        +title text
+        +cover_image jsonb
+        +data jsonb
+        +created_at timestamptz
+        +updated_at timestamptz
+    }
+    class Profile {
+        <<DB: profiles>>
+        +id uuid
+        +email text
+        +created_at timestamptz
+        +updated_at timestamptz
+    }
+    class LocalProject {
+        <<IndexedDB: projects>>
+        +id string
+        +title string
+        +type string
+        +data object
+        +coverImage object
+        +createdAt number
+        +updatedAt number
+    }
+    class SyncService {
+        +init()
+        +pushProject(p) Promise~void~
+        +pullLatest(id) Promise~LocalProject~
+        +pullAll() Promise~LocalProject[]~
+        +migrateLocal(list) Promise~void~
+        +deleteProject(id) Promise~void~
+        +subscribeRealtime(userId) unsubscribe
+    }
+    class OfflineQueue {
+        +enqueue(op) void
+        +flush() Promise~void~
+        +pendingCount() number
+    }
+    class CoverStorage {
+        +upload(ownerId, projectId, file) Promise~path~
+        +getUrl(path) string
+        +deleteFolder(ownerId, projectId) Promise~void~
+    }
+    class StatusManager {
+        +setStatus(s) void
+        +getStatus() string
+        +renderBar(host) void
+    }
+    class LoginUI {
+        +render() void
+        +handleLogin() void
+        +handleRegister() void
+        +enterOffline() void
+    }
+    class MigrationUI {
+        +maybeShow(localList, cloudIds) void
+        +run(list) Promise~void~
+    }
+    class AppState {
+        <<extends existing state>>
+        +user object
+        +isOnline boolean
+        +syncStatus string
+        +cloudTimer object
+        +pendingSync number
+    }
+
+    AuthService --> SupabaseClient : uses
+    SyncService --> SupabaseClient : uses
+    CoverStorage --> SupabaseClient : uses
+    SyncService ..> LocalProject : maps to
+    SyncService ..> CloudProject : read/write
+    SyncService --> OfflineQueue : uses
+    MigrationUI --> SyncService : uses
+    LoginUI --> AuthService : uses
+    StatusManager ..> AppState : reads
+    AppState ..> AuthService : holds user

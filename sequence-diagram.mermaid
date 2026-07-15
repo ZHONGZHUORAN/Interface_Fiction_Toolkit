@@ -1,0 +1,138 @@
+%% 1) 注册 / 登录
+sequenceDiagram
+    actor U as 用户
+    participant L as LoginUI
+    participant A as AuthService
+    participant S as Supabase Auth
+    participant SB as StatusManager
+    U->>L: 打开应用(未登录)
+    L->>L: render() 显示登录/离线入口
+    U->>L: 输入邮箱+密码, 点登录
+    L->>A: signIn(email,password)
+    A->>S: signInWithPassword()
+    alt 成功
+        S-->>A: session
+        A-->>L: session
+        L->>SB: setStatus(online)
+        L->>L: 进入首页(已登录)
+        L->>A: onAuthStateChange 持久化
+    else 失败
+        S-->>A: error
+        A-->>L: 内联错误(密码错/用户不存在/网络)
+    end
+
+%% 2) 首次本地数据迁移上云
+sequenceDiagram
+    actor U as 用户
+    participant A as AuthService
+    participant Sy as SyncService
+    participant IDB as IndexedDB
+    participant DB as Supabase projects
+    participant M as MigrationUI
+    U->>A: 登录成功
+    A->>Sy: init()
+    Sy->>IDB: idbGetAll() 本地项目
+    Sy->>DB: select id where owner_id
+    DB-->>Sy: 云端已有 id 集合
+    Sy->>M: maybeShow(localList, cloudIds)
+    alt 本地有云端没有的项目
+        M-->>U: 弹窗"发现 N 个本地作品"
+        U->>M: 点"全部迁移上云"
+        loop 逐条
+            M->>Sy: migrateLocal / pushProject(p) [upsert LWW]
+            Sy->>DB: upsert row
+        end
+        M-->>U: 进度 N/N 完成
+    else 无差异
+        M-->>U: 不弹窗
+    end
+
+%% 3) 日常编辑防抖同步
+sequenceDiagram
+    actor U as 用户
+    participant E as 编辑器(现有逻辑)
+    participant SS as scheduleSave(现有500ms)
+    participant CS as markDirtyAndSync(新增2s)
+    participant Q as OfflineQueue
+    participant DB as Supabase projects
+    U->>E: 编辑(增删楼层/消息/改封面)
+    E->>SS: scheduleSave()
+    SS->>IDB: idbPut(本地缓存)
+    E->>CS: markDirtyAndSync()
+    alt 在线
+        CS->>DB: upsert(updated_at=now)
+        DB-->>CS: ok
+        CS->>SB: setStatus(online·已同步)
+    else 离线
+        CS->>Q: enqueue(push op)
+        Q-->>CS: pendingCount++
+        CS->>SB: setStatus(离线, N条待同步)
+    end
+
+%% 4) 打开时自动拉取
+sequenceDiagram
+    actor U as 用户
+    participant H as 首页/编辑器
+    participant Sy as SyncService
+    participant DB as Supabase projects
+    participant IDB as IndexedDB
+    U->>H: 打开项目 id
+    H->>IDB: idbGet(id) 本地
+    alt 在线
+        H->>Sy: pullLatest(id)
+        Sy->>DB: select row where id,owner
+        DB-->>Sy: cloudRow
+        Sy->>Sy: LWW: cloud.updated_at > local.updated_at?
+        alt 云端更新
+            Sy->>IDB: idbPut(merged)
+            Sy-->>H: 返回最新
+        else 本地更新(未推送)
+            Sy-->>H: 保留本地, 后台推送
+        end
+    else 离线
+        H->>IDB: 直接读本地
+    end
+    H->>H: render()
+
+%% 5) Realtime 订阅(可选 P2-1)
+sequenceDiagram
+    participant Sy as SyncService
+    participant RT as Supabase Realtime
+    participant DB as projects 表
+    participant H as 当前设备UI
+    Sy->>RT: subscribeRealtime(userId) postgres_changes
+    Note over DB: 其他设备 upsert
+    DB->>RT: change event
+    RT-->>Sy: payload(row)
+    Sy->>Sy: LWW 比较 updated_at
+    alt 云端更新
+        Sy->>H: 提示"另一设备已更新" + 自动拉取
+        H->>H: render()
+    end
+
+%% 6) 冲突 last-write-wins
+sequenceDiagram
+    participant L as 本地项目
+    participant C as 云端项目
+    participant Sy as SyncService
+    Note over L,C: 同一 id, 不同设备
+    Sy->>Sy: compare(L.updated_at, C.updated_at)
+    alt L > C (本地较新/未推送)
+        Sy->>C: push L 覆盖云端
+    else C >= L (云端较新)
+        Sy->>L: pull C 覆盖本地(若本地有未推送改动则提示)
+    end
+
+%% 7) 登出
+sequenceDiagram
+    actor U as 用户
+    participant A as AuthService
+    participant S as Supabase Auth
+    participant IDB as IndexedDB
+    participant SB as StatusManager
+    U->>A: signOut()
+    A->>S: signOut()
+    S-->>A: ok(清除 refresh token)
+    A->>IDB: 保留本地数据(不删除)
+    A->>SB: setStatus(离线/未登录)
+    A-->>U: 回到登录界面 / 可进离线模式

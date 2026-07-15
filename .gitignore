@@ -1,0 +1,5 @@
+# 备份与临时文件
+*.bak
+.qa-result*.json
+node_modules/
+*.log
