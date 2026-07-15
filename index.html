@@ -3034,7 +3034,7 @@ const MigrationUI = {
     const skipBtn = el('button', { class:'btn btn-ghost' }, '跳过');
     row.appendChild(skipBtn); row.appendChild(allBtn);
     body.appendChild(row);
-    const closeFn = openModal(body);
+    const closeFn = openModal(body, ()=> injectSyncBars());
     const total = list.length; let done = 0;
     const update = ()=>{ fill.style.width = Math.round(done/total*100) + '%'; status.textContent = '进度 ' + done + '/' + total; };
     skipBtn.addEventListener('click', ()=> closeFn());
@@ -3092,6 +3092,10 @@ async function handleSignedIn(session){
   if(!__migrationDone){ try{ await maybeShowMigration(); }catch(e){ console.warn('[sync] migration', e); } }
   subscribeRealtime();
   flushQueue();
+  /* 兜底：登录 + 迁移流程全部结束后，再次确保顶部登录状态条（含「退出」）一定存在。
+     迁移弹窗通过 openModal(body, ()=> injectSyncBars()) 关闭时也会重新注入，
+     双保险避免弹窗打开期间发生重渲染/Realtime 事件导致同步条丢失后无法恢复。 */
+  injectSyncBars();
 }
 async function handleSignedOut(){
   __authReady = false;
