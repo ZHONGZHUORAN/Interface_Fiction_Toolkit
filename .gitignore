@@ -3,3 +3,4 @@
 .qa-result*.json
 node_modules/
 *.log
+_tmp_*.js
