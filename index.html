@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="light">
-<title>论坛体小说编辑器</title>
+<title>捡文学编辑器</title>
 <style>
   :root{
     --bg:#f5f6f8; --panel:#fff; --border:#e6e6e9; --text:#1f2329; --muted:#8a9099;
@@ -719,9 +719,9 @@ function render(){
 function renderHome(){
   const app=document.getElementById('app'); app.innerHTML=''; app.classList.remove('editor-view');
   const header=el('div',{class:'home-header'});
-  header.appendChild(el('h1',{}, '我的捡手机项目'));
+  header.appendChild(el('h1',{}, '我的作品'));
   const actions=el('div',{class:'home-actions'});
-  const newBtn=el('button',{class:'btn btn-primary'}, '+ 新建项目');
+  const newBtn=el('button',{class:'btn btn-primary'}, '+ 新建作品');
   newBtn.addEventListener('click', openNewProjectModal);
   const importBtn=el('button',{class:'btn btn-ghost'},'导入');
   importBtn.addEventListener('click', triggerImport);
@@ -730,7 +730,7 @@ function renderHome(){
   header.appendChild(actions); app.appendChild(header);
 
   if(!state.projects || state.projects.length===0){
-    app.appendChild(el('div',{class:'empty'}, '还没有项目，点“新建项目”开始'));
+    app.appendChild(el('div',{class:'empty'}, '还没有作品，点“新建作品”开始'));
     return;
   }
   const grid=el('div',{class:'card-grid'});
@@ -868,6 +868,26 @@ async function goHome(){
 }
 
 function triggerImport(){
+  openImportHelp();
+}
+
+/* 导入说明弹窗：先提示格式要求，用户点「选择文件」后再真正触发文件选择。 */
+function openImportHelp(){
+  const body=el('div',{class:'modal-body'});
+  body.appendChild(el('h3',{}, '导入作品'));
+  body.appendChild(el('p',{}, '请上传由本编辑器导出的 .json 项目文件。文件需包含项目数据、角色、聊天记录等，格式不正确可能导致导入失败。'));
+  const row=el('div',{class:'modal-row modal-actions'});
+  const cancel=el('button',{class:'btn btn-ghost'}, '取消');
+  const pick=el('button',{class:'btn btn-primary'}, '选择文件');
+  row.appendChild(cancel); row.appendChild(pick);
+  body.appendChild(row);
+  const closeFn=openModal(body);
+  cancel.addEventListener('click', ()=> closeFn());
+  pick.addEventListener('click', ()=>{ closeFn(); doPickFile(); });
+}
+
+/* 创建隐藏 file input 并触发文件选择，解析后写入本地库。 */
+function doPickFile(){
   const inp=el('input',{type:'file', accept:'.json,application/json', style:'display:none'});
   document.body.appendChild(inp);
   inp.addEventListener('change', async ()=>{
@@ -923,6 +943,7 @@ function renderEditor(){
   exportBtn.addEventListener('click',(e)=> toggleExportMenu(e.currentTarget));
 
   bar.appendChild(back); bar.appendChild(titleWrap); bar.appendChild(toggle); bar.appendChild(setBtn); bar.appendChild(exportBtn);
+  bar.appendChild(buildAccountBtn({id:'editor-account-btn'}));
   bar.appendChild(buildSettings());
   app.appendChild(bar);
 
@@ -1623,13 +1644,14 @@ function openModal(content, onClose, opts){
   backdrop.addEventListener('click',(e)=>{ if(e.target===backdrop) closeFn(); });
   return closeFn;
 }
-function confirmDialog(message){
+function confirmDialog(message, okText){
+  okText = okText || '删除';
   return new Promise(resolve=>{
     const body=el('div',{class:'modal-body'});
     body.appendChild(el('p',{}, message));
     const row=el('div',{class:'modal-row modal-actions'});
     const cancel=el('button',{class:'btn btn-ghost'}, '取消');
-    const ok=el('button',{class:'btn btn-danger'}, '删除');
+    const ok=el('button',{class:'btn btn-danger'}, okText);
     row.appendChild(cancel); row.appendChild(ok);
     body.appendChild(row);
     const closeFn=openModal(body);
@@ -2980,16 +3002,18 @@ function paintAccountBtn(btn){
   if(state.offlineMode) btn.appendChild(el('span', { class:'account-offline-dot' }));
   else if(state.userId) btn.appendChild(el('span', { class:'account-online' }));
 }
-function buildAccountBtn(){
-  const btn = el('button', { id:'account-btn', class:'account-btn', title:'账号' });
+function buildAccountBtn(opts){
+  opts = opts || {};
+  const id = opts.id || 'account-btn';
+  const btn = el('button', { id, class:'account-btn', title:'账号' });
   btn.addEventListener('click', ()=> openAccountPanel());
   paintAccountBtn(btn);
   return btn;
 }
 function refreshAccountBtn(){
-  const btn = document.getElementById('account-btn');
-  if(!btn) return; /* 仅首页存在，编辑器视图不渲染 → no-op */
-  paintAccountBtn(btn);
+  const btns = document.querySelectorAll('.account-btn');
+  if(!btns || btns.length===0) return; /* 没有头像按钮时 no-op 兜底 */
+  btns.forEach(btn => paintAccountBtn(btn));
 }
 function refreshHeadAvatar(ava){
   if(!ava) return;
@@ -3139,7 +3163,7 @@ function buildLoginOverlay(){
   if(__loginOverlay) return;
   const ov = el('div', { id:'login-overlay', class:'login-overlay' });
   const card = el('div', { class:'login-card' });
-  card.appendChild(el('h2', {}, '📖 小说编辑器'));
+  card.appendChild(el('h2', {}, '捡文学编辑器'));
   card.appendChild(el('p', { class:'login-sub' }, '登录后即可跨设备同步你的作品'));
   const email = el('input', { class:'inp', type:'email', placeholder:'邮箱', id:'login-email' });
   const pwd = el('input', { class:'inp', type:'password', placeholder:'密码（至少 6 位）', id:'login-pwd' });
@@ -3241,7 +3265,7 @@ async function doReset(){
   }catch(e){ loginError(translateAuthError(e)); }
 }
 async function doLogout(){
-  const ok = await confirmDialog('确定退出登录？本地作品会保留，可离线查看。');
+  const ok = await confirmDialog('确定退出登录？本地作品会保留，可离线查看。', '确认退出');
   if(!ok) return;
   try{ await authSignOut(); }catch(e){}
   /* onAuthStateChange SIGNED_OUT → handleSignedOut */
