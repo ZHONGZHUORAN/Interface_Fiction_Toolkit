@@ -816,7 +816,14 @@ async function openProject(id){
 }
 async function goHome(){
   state.view='home'; state.currentProject=null;
-  try{ state.projects=await idbGetAll(); }catch(e){ state.projects=[]; }
+  let fresh=[];
+  try{ fresh=await idbGetAll(); }catch(e){ fresh=[]; }
+  /* 合并内存中已存在但本次索引读回未包含的项目（如离线/file:// 下新建写入尚未被读回）。
+     以 id 去重，索引读回优先；内存副本仅作为“新建未即时可见”时的兜底，避免列表刷新丢失。 */
+  const byId=new Map();
+  for(const p of fresh){ if(p && p.id) byId.set(p.id, p); }
+  for(const p of (state.projects||[])){ if(p && p.id && !byId.has(p.id)) byId.set(p.id, p); }
+  state.projects=Array.from(byId.values());
   state.projects.sort((a,b)=>b.updatedAt-a.updatedAt);
   render();
 }
@@ -1648,7 +1655,11 @@ function openNewProjectModal(){
       else state.activeSenderId=null;
     }
     closeFn();
-    await idbPut(p); render();
+    await idbPut(p);
+    /* 新建后立即加入内存列表：避免离线/file:// 下“返回首页”时 idbGetAll 尚未读回刚写入记录导致新建丢失 */
+    if(!state.projects.some(x=>x.id===p.id)) state.projects.push(p);
+    state.projects.sort((a,b)=>b.updatedAt-a.updatedAt);
+    render();
   });
 }
 

@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>清除缓存 · 论坛/聊天体小说编辑器</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+         max-width: 600px; margin: 48px auto; padding: 0 18px; color: #222; line-height: 1.6; }
+  h1 { font-size: 21px; margin-bottom: 4px; }
+  .muted { color: #888; font-size: 13px; }
+  .card { border: 1px solid #eaeaea; border-radius: 14px; padding: 18px 20px; margin: 18px 0; background: #fafafa; }
+  .card p { margin: 6px 0; }
+  button { font-size: 15px; padding: 11px 18px; border-radius: 9px; border: 1px solid #ccc;
+           background: #fff; cursor: pointer; transition: .15s; }
+  button:hover { filter: brightness(.97); }
+  button.primary { background: #07c160; color: #fff; border-color: #07c160; }
+  button.danger { background: #fff; color: #e54d42; border-color: #e54d42; }
+  code { background: #f0f0f0; padding: 1px 5px; border-radius: 4px; font-size: 13px; }
+  #log { white-space: pre-wrap; font-size: 13px; color: #333; margin-top: 14px;
+         background: #fff; border: 1px dashed #ddd; border-radius: 10px; padding: 12px; min-height: 40px; }
+  b.warn { color: #e54d42; }
+</style>
+</head>
+<body>
+  <h1>清除缓存工具</h1>
+  <p class="muted">用于解决「已登录却看不到退出按钮」的卡死状态。请把它放在 <code>index.html</code> 同一目录下打开。</p>
+
+  <div class="card">
+    <p><b>① 清除登录会话（安全，推荐先点这个）</b></p>
+    <p class="muted">删除浏览器 localStorage 中的 Supabase 会话令牌与同步队列，让你退出登录、回到登录界面。<b>不会删除你的本地项目。</b></p>
+    <button class="primary" id="clearAuth">清除登录会话</button>
+  </div>
+
+  <div class="card">
+    <p><b>② 本地项目数据（IndexedDB）</b></p>
+    <p>当前本地项目数：<b id="projCount">检测中…</b></p>
+    <p class="muted"><b class="warn">⚠️ 谨慎：</b>如果你之前迁移时点了「跳过」，这些项目尚未上云。点下面按钮会<b class="warn">彻底删除</b>本地数据库，无法恢复。</p>
+    <button class="danger" id="clearAll">同时删除本地项目数据</button>
+  </div>
+
+  <div id="log">就绪。</div>
+
+  <script>
+    const DB = 'forum-novel-db';
+    const log = (m) => { document.getElementById('log').textContent += '\n' + m; };
+    const isAuthKey = (k) => k.startsWith('sb-') || k.toLowerCase().includes('supabase') || k === '__sync_queue__';
+
+    // 统计本地项目数
+    (async () => {
+      try {
+        const req = indexedDB.open(DB);
+        req.onsuccess = (e) => {
+          const db = e.target.result;
+          if (db.objectStoreNames.contains('projects')) {
+            const tx = db.transaction('projects', 'readonly');
+            const cnt = tx.objectStore('projects').count();
+            cnt.onsuccess = () => { document.getElementById('projCount').textContent = cnt.result + ' 个'; };
+          } else { document.getElementById('projCount').textContent = '0 个'; }
+          db.close();
+        };
+        req.onerror = () => { document.getElementById('projCount').textContent = '读取失败'; };
+      } catch (err) { document.getElementById('projCount').textContent = '读取失败'; }
+    })();
+
+    const clearAuth = () => {
+      let n = 0;
+      try {
+        Object.keys(localStorage).forEach(k => { if (isAuthKey(k)) { localStorage.removeItem(k); n++; } });
+        localStorage.removeItem('__sync_queue__');
+      } catch (e) { log('清除失败：' + e.message); return; }
+      log('✅ 已清除 ' + n + ' 项登录会话缓存。\n请重新打开 index.html（建议 Ctrl+Shift+R 硬刷新），将显示登录界面。');
+    };
+
+    document.getElementById('clearAuth').onclick = clearAuth;
+
+    document.getElementById('clearAll').onclick = () => {
+      if (!confirm('确定删除全部本地项目数据？此操作不可恢复！')) return;
+      clearAuth();
+      const del = indexedDB.deleteDatabase(DB);
+      del.onsuccess = () => { log('✅ 已删除本地项目数据库。'); document.getElementById('projCount').textContent = '0 个'; };
+      del.onerror = () => { log('❌ 删除失败：' + (del.error && del.error.message)); };
+      del.onblocked = () => { log('⚠️ 数据库被占用，请先关闭 index.html 标签页再重试。'); };
+    };
+  </script>
+</body>
+</html>
