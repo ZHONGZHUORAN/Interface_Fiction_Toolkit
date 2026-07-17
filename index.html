@@ -783,6 +783,7 @@ function renderHome(){
 }
 
 function buildHomeCard(p){
+  if(!p || !p.data) p={data:{}, title:'未命名小说'};
   const card=el('div',{class:'proj-card'});
   const isPickup = p.type==='pickup';
   const thumb=el('div',{class:'thumb'});
@@ -790,7 +791,7 @@ function buildHomeCard(p){
   if(p.data.coverImage && p.data.coverImage.dataUrl){
     coverImg=p.data.coverImage;
   } else if(!isPickup){
-    coverImg=p.data.cover.images && p.data.cover.images[0];
+    coverImg=p.data.cover && p.data.cover.images && p.data.cover.images[0];
   }
   if(coverImg) thumb.appendChild(el('img',{class:'thumb-img', src:coverImg.dataUrl, alt:''}));
   else thumb.appendChild(buildThumbPlaceholder(p, isPickup));
