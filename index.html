@@ -2817,6 +2817,9 @@ async function pushProject(p){
     return false;
   }
   OfflineQueue.remove(p.id);
+  // 标记这是本页面自己刚推送的项目，Realtime 把同一事件推回来时忽略，避免误弹"其他设备更新"窗。
+  state.__ownPushes = state.__ownPushes || new Map();
+  state.__ownPushes.set(p.id, p.updatedAt || Date.now());
   return true;
 }
 async function deleteProject(id){
@@ -2952,6 +2955,23 @@ async function subscribeRealtime(){
 }
 async function handleRealtimeEvent(payload){
   const ev = payload.eventType;
+  // 忽略本页面自己刚推送而产生的 Realtime 回环事件（Supabase 不区分事件来源）。
+  if(ev==='UPDATE' || ev==='INSERT'){
+    const newRow = payload.new;
+    if(newRow && newRow.id && newRow.updated_at){
+      const cloudU = Date.parse(newRow.updated_at);
+      const ownTs = state.__ownPushes && state.__ownPushes.get(newRow.id);
+      if(ownTs && Math.abs(cloudU - ownTs) <= 2000){
+        // 自己刚推的，不弹窗、不覆盖，直接忽略。
+        return;
+      }
+    }
+  }
+  // 清理 5 分钟前的 ownPush 记录
+  if(state.__ownPushes){
+    const now = Date.now();
+    for(const [id, ts] of state.__ownPushes){ if(now - ts > 5*60*1000) state.__ownPushes.delete(id); }
+  }
   if(ev==='DELETE'){
     const id = (payload.old && payload.old.id) || null;
     if(!id) return;
