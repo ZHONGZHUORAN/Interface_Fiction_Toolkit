@@ -808,7 +808,7 @@ function buildHomeCard(p){
   const acts=el('div',{class:'proj-acts'});
   const renBtn=el('button',{class:'btn btn-mini'}, '重命名');
   renBtn.addEventListener('click',(e)=>{ e.stopPropagation(); startRename(p, card); });
-  const delBtn=el('button',{class:'btn btn-mini btn-danger', title:'删除'}, iconSvg('trash'));
+  const delBtn=el('button',{class:'btn btn-mini btn-danger'}, '删除');
   delBtn.addEventListener('click', async (e)=>{ e.stopPropagation();
     const ok=await confirmDialog('确定删除「'+(p.title||'未命名小说')+'」？此操作不可撤销。');
     if(ok){ await idbDelete(p.id); state.projects=state.projects.filter(x=>x.id!==p.id); renderHome(); }
@@ -2866,7 +2866,13 @@ async function pullAllAndMerge(){
   const merged = [];
   for(const c of cloudList){
     const local = localMap.get(c.id);
-    if(!local) merged.push(c);
+    if(!local){
+      // 云端有、本地无：近期项目视为其他设备新建，正常拉回；
+      // 老旧残留（>14天）大概率是已删的云端幽灵，跳过并静默清云端，避免回到首页。
+      const age = Date.now() - (c.updatedAt||0);
+      if(age > 14*86400000){ try{ await deleteProject(c.id); }catch(e){} continue; }
+      merged.push(c);
+    }
     else if((c.updatedAt||0) > (local.updatedAt||0) + 2000) merged.push(c);
     else { merged.push(local); if((local.updatedAt||0) > (c.updatedAt||0) + 2000) pushProject(local); }
   }
@@ -2960,6 +2966,12 @@ async function handleRealtimeEvent(payload){
   const cloud = fromCloudRow(newRow);
   const local = (state.projects || []).find(p=>p.id===cloud.id)
     || ((state.currentProject && state.currentProject.id===cloud.id) ? state.currentProject : null);
+  if(!local){
+    // 本地无此项目：用户已删除或从未拥有，云端是历史残留（幽灵）。
+    // 不弹同步窗打扰用户，并静默尝试从云端彻底清除，避免反复骚扰。
+    try{ await deleteProject(cloud.id); }catch(e){}
+    return;
+  }
   const localU = local ? (local.updatedAt || 0) : 0;
   const cloudU = cloud.updatedAt || 0;
   if(cloudU > localU + 2000){
