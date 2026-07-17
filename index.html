@@ -344,8 +344,12 @@
   .wx-bubble.other::before{
     content:''; position:absolute; top:12px; left:-7px; width:0; height:0;
     border-top:6px solid transparent; border-bottom:6px solid transparent; border-right:8px solid #fff; }
-  .wx-bubble.blocked::after{
-    content:'!'; position:absolute; top:-5px; right:-5px; width:16px; height:16px; border-radius:50%;
+  .wx-bubble.withdrawn{ opacity:0.55; }
+  .wx-bubble.me.blocked::after{
+    content:'!'; position:absolute; left:-5px; top:50%; transform:translateY(-50%); width:16px; height:16px; border-radius:50%;
+    background:#fa5151; color:#fff; font-size:12px; font-weight:700; line-height:16px; text-align:center; }
+  .wx-bubble.other.blocked::after{
+    content:'!'; position:absolute; right:-5px; top:50%; transform:translateY(-50%); width:16px; height:16px; border-radius:50%;
     background:#fa5151; color:#fff; font-size:12px; font-weight:700; line-height:16px; text-align:center; }
   .wx-rejected-tip{ text-align:center; font-size:12px; color:#b3b3b3; margin:4px 0 8px; padding:0 16px; }
 
@@ -2023,7 +2027,6 @@ function buildMessageBubble(msg, ctx){
   if(msg.isSystem || msg.type==='system'){ wrap.appendChild(buildSystemLine(msg, chat)); return wrap; }
   const sender=chat.members.find(m=>m.id===msg.senderId)||null;
   const isMe=!!(sender&&sender.isMe);
-  if(msg.withdrawn){ wrap.appendChild(buildSystemLine({kind:'withdraw', name:senderName(sender,isMe)}, chat)); return wrap; }
 
   // 捡手机文学：自动时间戳已移除，仅保留手动添加的时间戳（kind='timestamp' 系统消息）。
   // 原自动渲染块：if(state.currentProject.data.settings.showTime && msg.time){ wrap.appendChild(el('div',{class:'wx-msg-time'}, shortTime(msg.time))); }
@@ -2037,7 +2040,7 @@ function buildMessageBubble(msg, ctx){
   if(msg.quote && msg.quote.snippet){
     bubbleCol.appendChild(el('div',{class:'wx-quote'}, msg.quote.snippet));
   }
-  const bubble=el('div',{class:'wx-bubble '+(isMe?'me':'other')+(msg.blocked?' blocked':'')});
+  const bubble=el('div',{class:'wx-bubble '+(isMe?'me':'other')+(msg.blocked?' blocked':'')+(msg.withdrawn?' withdrawn':'')});
   if(msg.type==='image'){
     if(msg.image && msg.image.dataUrl) bubble.appendChild(el('img',{class:'wx-bubble-img', src:msg.image.dataUrl, alt:msg.image.name||''}));
     if(msg.text) bubble.appendChild(el('div',{class:'wx-bubble-text'}, msg.text));
@@ -2061,6 +2064,7 @@ function buildMessageBubble(msg, ctx){
   }
   wrap.appendChild(row);
   if(msg.blocked){ wrap.appendChild(el('div',{class:'wx-rejected-tip'}, '消息已发出，但被对方拒收了')); }
+  if(msg.withdrawn){ wrap.appendChild(buildSystemLine({kind:'withdraw', name:senderName(sender,isMe)}, chat)); }
   return wrap;
 }
 function buildVoiceBubble(msg){
@@ -2518,17 +2522,13 @@ function prepareMessage(msg, chat, ctx, imageMap, settings){
     const h=BLOCK_TOP+Math.max(lines.length,1)*18+6;
     return { kind:'sys', height:h, separator:false, draw(ctx,x,y){ setFont(ctx,13,400); ctx.fillStyle='#b3b3b3'; ctx.textAlign='center'; ctx.textBaseline='middle'; const ly=y+BLOCK_TOP; lines.forEach((ln,i)=> ctx.fillText(ln, x+CONTENT_W/2, ly+9+i*18)); ctx.textAlign='left'; } };
   }
-  if(msg.withdrawn){
-    const name=senderName(sender,isMe); const text=name+' 撤回了一条消息';
-    setFont(ctx,13,400); const lines=wrapText(ctx,text,CONTENT_W-20);
-    const h=BLOCK_TOP+Math.max(lines.length,1)*18+6;
-    return { kind:'sys', height:h, separator:false, draw(ctx,x,y){ setFont(ctx,13,400); ctx.fillStyle='#b3b3b3'; ctx.textAlign='center'; ctx.textBaseline='middle'; const ly=y+BLOCK_TOP; lines.forEach((ln,i)=> ctx.fillText(ln, x+CONTENT_W/2, ly+9+i*18)); ctx.textAlign='left'; } };
-  }
-  if(msg.blocked){
-    const text='消息已发出，但被对方拒收了';
-    setFont(ctx,13,400); const lines=wrapText(ctx,text,CONTENT_W-20);
-    const h=BLOCK_TOP+Math.max(lines.length,1)*18+6;
-    return { kind:'sys', height:h, separator:false, draw(ctx,x,y){ setFont(ctx,13,400); ctx.fillStyle='#b3b3b3'; ctx.textAlign='center'; ctx.textBaseline='middle'; const ly=y+BLOCK_TOP; lines.forEach((ln,i)=> ctx.fillText(ln, x+CONTENT_W/2, ly+9+i*18)); ctx.textAlign='left'; } };
+
+  // 系统提示（撤回/拒收）：与 DOM 行为一致，原气泡保留，下方追加系统提示。
+  let sysText='', sysLines=[], sysH=0;
+  if(msg.withdrawn || msg.blocked){
+    sysText = msg.withdrawn ? (senderName(sender,isMe)+' 撤回了一条消息') : '消息已发出，但被对方拒收了';
+    setFont(ctx,13,400); sysLines=wrapText(ctx, sysText, CONTENT_W-20);
+    sysH = BLOCK_TOP + Math.max(sysLines.length,1)*18 + 6;
   }
 
   let quoteLines=null, quoteH=0;
@@ -2563,7 +2563,7 @@ function prepareMessage(msg, chat, ctx, imageMap, settings){
   }
   const bubbleH=PADY*2 + quoteH + contentH;
   const rowH=Math.max(AV, bubbleH);
-  const h=BLOCK_TOP + (showName?WX_NAME_H:0) + rowH + 6;
+  const h=BLOCK_TOP + (showName?WX_NAME_H:0) + rowH + 6 + sysH;
 
   const waveSeed=hashStr(msg.id||'x');
   const bSenderName=(sender?sender.name:null);
@@ -2571,6 +2571,7 @@ function prepareMessage(msg, chat, ctx, imageMap, settings){
   const bIsMe=isMe, bType=type, bAvatarImg=avatarImg, bShowName=showName;
   const bImg=img, bImgW=imgW, bImgH=imgH, bTextLines=textLines, bVoiceLines=voiceLines, bQuoteLines=quoteLines;
   const bBubbleW=bubbleW, bBubbleH=bubbleH, bQuoteH=quoteH;
+  const bWithdrawn=!!msg.withdrawn, bSysText=sysText, bSysH=sysH, bSysLines=sysLines;
 
   return { kind:'msg', height:h, separator:false, breakAfter:!!msg.pageBreak,
     draw(ctx,x,y){
@@ -2580,6 +2581,7 @@ function prepareMessage(msg, chat, ctx, imageMap, settings){
       const bx = bIsMe ? (x+CONTENT_W-bBubbleW) : (x+AV+GAP);
       const avatarX = bIsMe ? (x+CONTENT_W-AV) : x;
       drawAvatarWx(ctx, bAvatarImg, bSenderName, avatarX, rowTop, AV);
+      const bPrevAlpha=ctx.globalAlpha; if(bWithdrawn) ctx.globalAlpha=0.55;
       const by=rowTop;
       ctx.fillStyle=bIsMe?'#95EC69':'#ffffff';
       roundRect(ctx,bx,by,bBubbleW,bBubbleH,8); ctx.fill();
@@ -2616,6 +2618,13 @@ function prepareMessage(msg, chat, ctx, imageMap, settings){
       } else {
         setFont(ctx,15,400); ctx.fillStyle='#1f1f1f'; ctx.textAlign='left'; ctx.textBaseline='middle';
         bTextLines.forEach((ln,i)=> ctx.fillText(ln, bx+PADX, incy+WX_BUBBLE_LH/2+i*WX_BUBBLE_LH));
+      }
+      ctx.globalAlpha=bPrevAlpha;
+      if(bSysText){
+        setFont(ctx,13,400); ctx.fillStyle='#b3b3b3'; ctx.textAlign='center'; ctx.textBaseline='middle';
+        const ly = y + h - bSysH + BLOCK_TOP;
+        bSysLines.forEach((ln,i)=> ctx.fillText(ln, x+CONTENT_W/2, ly+9+i*18));
+        ctx.textAlign='left';
       }
     }
   };
