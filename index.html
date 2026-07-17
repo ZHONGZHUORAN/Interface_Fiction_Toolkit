@@ -1754,7 +1754,6 @@ function downloadDataUrl(filename, dataUrl){
 function openNewProjectModal(){
   const body=el('div',{class:'modal-body'});
   body.appendChild(el('h3',{}, '新建作品'));
-  body.appendChild(el('div',{class:'wx-tip'}, '请使用虚拟角色创作；如基于真人改编，文末可加 ooc 致歉声明。'));
   const seg=el('div',{class:'seg', style:'width:100%'});
   const forumB=el('button',{class:'seg-btn active', style:'flex:1'}, '论坛体');
   const pickupB=el('button',{class:'seg-btn', style:'flex:1'}, '聊天体');
