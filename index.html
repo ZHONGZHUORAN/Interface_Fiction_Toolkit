@@ -28,6 +28,17 @@
   .btn-block{width:100%; margin-top:14px;}
   .btn-sm{min-height:34px; padding:0 12px; font-size:13px;}
   .btn-mini{min-height:32px; padding:0 10px; font-size:13px; border-radius:8px;}
+
+  /* SVG 文本图标体系 */
+  .icon-svg{ display:inline-flex; align-items:center; justify-content:center; vertical-align:middle; line-height:0; }
+  .icon-svg svg{ width:18px; height:18px; display:block; }
+  .icon-svg.icon-lg svg{ width:22px; height:22px; }
+
+  /* 实时同步中转圈遮罩 */
+  .sync-spinner-overlay{ position:fixed; inset:0; background:rgba(255,255,255,.72); display:flex; align-items:center; justify-content:center; flex-direction:column; gap:12px; z-index:9999; }
+  .sync-spinner{ width:36px; height:36px; border:4px solid #e3e6ea; border-top-color:#3b82f6; border-radius:50%; animation:spin .8s linear infinite; }
+  .sync-spinner-text{ font-size:14px; color:#1f2329; }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
   .btn.is-on{background:#eef0f3; color:var(--text);}
   .op-toggle{color:var(--muted);}
   .op-toggle.active{background:var(--accent); color:#fff; border-color:var(--accent);}
@@ -488,7 +499,7 @@ function formatDate(ts){ const d=new Date(ts); const p=n=>String(n).padStart(2,'
 function formatTime(s){ return String(s||'').replace('T',' '); }
 
 /* 轻量 DOM 构造器 */
-function el(tag, attrs, children){
+function el(tag, attrs, ...children){
   const e=document.createElement(tag);
   attrs=attrs||{};
   for(const k in attrs){
@@ -502,15 +513,24 @@ function el(tag, attrs, children){
     else if(v===true) e.setAttribute(k,'');
     else e.setAttribute(k, v);
   }
-  if(children!=null){
-    const list=Array.isArray(children)?children:[children];
-    for(const c of list){
-      if(c==null) continue;
-      e.appendChild((typeof c==='string'||typeof c==='number')?document.createTextNode(String(c)):c);
-    }
+  const list = children.flat(Infinity);
+  for(const c of list){
+    if(c==null) continue;
+    e.appendChild((typeof c==='string'||typeof c==='number')?document.createTextNode(String(c)):c);
   }
   return e;
 }
+
+/* ---------- 文本图标 → SVG 图标体系 ---------- */
+const ICON_SVG = {
+  back: '<svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg"><path d="M224.32 505.6a31.936 31.936 0 0 1 10.88-19.84l222.08-222.08a32 32 0 0 1 45.12 45.12l-169.28 169.28H768a32 32 0 0 1 0 64H333.12l169.28 169.28a32 32 0 1 1-45.12 45.44l-224-224a31.968 31.968 0 0 1-8.96-27.2z" fill="#202425"/></svg>',
+  up: '<svg viewBox="0 0 1048 1024" xmlns="http://www.w3.org/2000/svg"><path d="M565.514 273.221c0.393 0.394 0.491 0.935 0.861 1.326l431.062 392.233c23.201 23.692 23.471 61.883 0.566 85.254-22.906 23.374-60.284 23.126-83.511-0.589l-390.168-355.025-390.933 355.739c-23.224 23.691-60.826 23.716-84.025 0.049-23.174-23.692-23.151-62.079 0.049-85.795l432.096-393.168c23.199-23.692 60.827-23.716 84.001-0.024z" fill="#272536"/></svg>',
+  down: '<svg viewBox="0 0 1048 1024" xmlns="http://www.w3.org/2000/svg" style="transform:scaleY(-1)"><path d="M565.514 273.221c0.393 0.394 0.491 0.935 0.861 1.326l431.062 392.233c23.201 23.692 23.471 61.883 0.566 85.254-22.906 23.374-60.284 23.126-83.511-0.589l-390.168-355.025-390.933 355.739c-23.224 23.691-60.826 23.716-84.025 0.049-23.174-23.692-23.151-62.079 0.049-85.795l432.096-393.168c23.199-23.692 60.827-23.716 84.001-0.024z" fill="#272536"/></svg>',
+  plus: '<svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg"><path d="M224 464h576a48 48 0 0 1 0 96h-576a48 48 0 0 1 0-96z" fill="currentColor"/><path d="M560 224v576a48 48 0 0 1-96 0v-576a48 48 0 0 1 96 0z" fill="currentColor"/></svg>',
+  cloud: '<svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg"><path d="M746.666667 725.333333c59.733333-12.8 106.666667-64 106.666666-128 0-72.533333-55.466667-128-128-128-17.066667 0-29.866667 4.266667-42.666666 8.533334V469.333333c0-93.866667-76.8-170.666667-170.666667-170.666666s-170.666667 76.8-170.666667 170.666666c0 17.066667 4.266667 29.866667 4.266667 46.933334-8.533333-4.266667-17.066667-4.266667-25.6-4.266667C260.266667 512 213.333333 558.933333 213.333333 618.666667S260.266667 725.333333 320 725.333333h426.666667z m0 85.333334h-426.666667C213.333333 810.666667 128 725.333333 128 618.666667c0-85.333333 55.466667-157.866667 128-183.466667C273.066667 311.466667 379.733333 213.333333 512 213.333333c110.933333 0 209.066667 72.533333 243.2 170.666667 127.466667 0 192 102.4 192 213.333333s-85.333333 200.533333-192 213.333334z" fill="#444444"/></svg>',
+  trash: '<svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg"><path d="M799.2 874.4c0 34.4-28.001 62.4-62.4 62.4H287.2c-34.4 0-62.4-28-62.4-62.4V212h574.4v662.4zM349.6 100c0-7.2 5.6-12.8 12.8-12.8h300c7.2 0 12.8 5.6 12.8 12.8v37.6H349.6V100z m636.8 37.6H749.6V100c0-48.001-39.2-87.2-87.2-87.2h-300c-48 0-87.2 39.199-87.2 87.2v37.6H37.6C16.8 137.6 0 154.4 0 175.2s16.8 37.6 37.6 37.6h112v661.6c0 76 61.6 137.6 137.6 137.6h449.6c76 0 137.6-61.6 137.6-137.6V212h112c20.8 0 37.6-16.8 37.6-37.6s-16.8-36.8-37.6-36.8zM512 824c20.8 0 37.6-16.8 37.6-37.6v-400c0-20.8-16.8-37.6-37.6-37.6s-37.6 16.8-37.6 37.6v400c0 20.8 16.8 37.6 37.6 37.6m-175.2 0c20.8 0 37.6-16.8 37.6-37.6v-400c0-20.8-16.8-37.6-37.6-37.6s-37.6 16.8-37.6 37.6v400c0.8 20.8 17.6 37.6 37.6 37.6m350.4 0c20.8 0 37.6-16.8 37.6-37.6v-400c0-20.8-16.8-37.6-37.6-37.6s-37.6 16.8-37.6 37.6v400c0 20.8 16.8 37.6 37.6 37.6" fill="#8A8A8A"/></svg>'
+};
+function iconSvg(type){ return el('span', { class:'icon-svg', html: ICON_SVG[type] || '' }); }
 
 /* ---------- 数据模型 / 纯函数 ---------- */
 function newProject(type){
@@ -721,7 +741,7 @@ function renderHome(){
   const header=el('div',{class:'home-header'});
   header.appendChild(el('h1',{}, '我的作品'));
   const actions=el('div',{class:'home-actions'});
-  const newBtn=el('button',{class:'btn btn-primary'}, '+ 新建作品');
+  const newBtn=el('button',{class:'btn btn-primary'}, iconSvg('plus'), ' 新建作品');
   newBtn.addEventListener('click', openNewProjectModal);
   const importBtn=el('button',{class:'btn btn-ghost'},'导入');
   importBtn.addEventListener('click', triggerImport);
@@ -763,7 +783,7 @@ function buildHomeCard(p){
   const acts=el('div',{class:'proj-acts'});
   const renBtn=el('button',{class:'btn btn-mini'}, '重命名');
   renBtn.addEventListener('click',(e)=>{ e.stopPropagation(); startRename(p, card); });
-  const delBtn=el('button',{class:'btn btn-mini btn-danger'}, '删除');
+  const delBtn=el('button',{class:'btn btn-mini btn-danger', title:'删除'}, iconSvg('trash'));
   delBtn.addEventListener('click', async (e)=>{ e.stopPropagation();
     const ok=await confirmDialog('确定删除「'+(p.title||'未命名小说')+'」？此操作不可撤销。');
     if(ok){ await idbDelete(p.id); state.projects=state.projects.filter(x=>x.id!==p.id); renderHome(); }
@@ -911,7 +931,7 @@ function renderEditor(){
   const p=state.currentProject;
 
   const bar=el('div',{class:'topbar'});
-  const back=el('button',{class:'btn btn-ghost'}, '← 返回列表');
+  const back=el('button',{class:'btn btn-ghost'}, iconSvg('back'), ' 返回列表');
   back.addEventListener('click', goHome);
   const titleWrap=el('div',{class:'title-edit'});
   const titleBtn=el('div',{class:'title-btn'}, p.title);
@@ -1006,7 +1026,7 @@ function buildSettings(){
   const coverRight=el('div');
   if(data.coverImage && data.coverImage.dataUrl){
     coverRight.appendChild(el('img',{style:'height:32px;width:32px;object-fit:cover;border-radius:4px;margin-right:8px', src:data.coverImage.dataUrl, alt:''}));
-    const delCover=el('button',{class:'btn btn-mini btn-danger'}, '删除');
+    const delCover=el('button',{class:'btn btn-mini btn-danger', title:'删除'}, iconSvg('trash'));
     delCover.addEventListener('click',()=>{ data.coverImage=null; scheduleSave(); renderEditor(); });
     coverRight.appendChild(delCover);
   } else {
@@ -1035,7 +1055,7 @@ function buildPickupSettings(){
   const right=el('div');
   if(data.coverImage && data.coverImage.dataUrl){
     right.appendChild(el('img',{style:'height:32px;width:32px;object-fit:cover;border-radius:4px;margin-right:8px', src:data.coverImage.dataUrl, alt:''}));
-    const del=el('button',{class:'btn btn-mini btn-danger'}, '删除');
+    const del=el('button',{class:'btn btn-mini btn-danger', title:'删除'}, iconSvg('trash'));
     del.addEventListener('click',()=>{ data.coverImage=null; scheduleSave(); renderPickup(); });
     right.appendChild(del);
   } else {
@@ -1133,7 +1153,7 @@ function buildEditorEdit(){
       delBtn.addEventListener('click',(e)=>{ e.stopPropagation(); data.cover.avatar=null; buildEditorContentRefresh(); scheduleSave(); });
       coverCircleWrap.appendChild(delBtn);
     } else {
-      coverCircle.appendChild(el('span',{class:'cover-circle-plus'}, '+'));
+      coverCircle.appendChild(el('span',{class:'cover-circle-plus icon-lg'}, iconSvg('plus')));
     }
   }
   renderCoverCircle();
@@ -1173,7 +1193,7 @@ function buildEditorEdit(){
 
   data.floors.forEach((f,i)=> wrap.appendChild(buildFloorEdit(f, i+1, data.floors, showTime)));
 
-  const addBtn=el('button',{class:'btn btn-primary btn-block'}, '+ 添加楼层');
+  const addBtn=el('button',{class:'btn btn-primary btn-block'}, iconSvg('plus'), ' 添加楼层');
   addBtn.addEventListener('click',()=>{ data.floors.push(newFloor()); buildEditorContentRefresh(); scheduleSave(); });
   wrap.appendChild(addBtn);
   return wrap;
@@ -1203,9 +1223,9 @@ function buildFloorEdit(floor, num, floors, showTime){
   quoteSel.addEventListener('change',()=>{ floor.quote=quoteSel.value||null; scheduleSave(); schedulePreviewRefresh(); });
   const opToggle=el('button',{class:'btn btn-mini op-toggle'+(floor.isOP?' active':''), title:'标记为楼主帖'}, '楼主');
   opToggle.addEventListener('click',()=>{ floor.isOP=!floor.isOP; opToggle.classList.toggle('active', floor.isOP); scheduleSave(); schedulePreviewRefresh(); });
-  const up=el('button',{class:'btn btn-mini'}, '↑'); up.addEventListener('click',()=>moveFloor(floor.id,'up'));
-  const down=el('button',{class:'btn btn-mini'}, '↓'); down.addEventListener('click',()=>moveFloor(floor.id,'down'));
-  const del=el('button',{class:'btn btn-mini btn-danger'}, '删');
+  const up=el('button',{class:'btn btn-mini'}, iconSvg('up')); up.addEventListener('click',()=>moveFloor(floor.id,'up'));
+  const down=el('button',{class:'btn btn-mini'}, iconSvg('down')); down.addEventListener('click',()=>moveFloor(floor.id,'down'));
+  const del=el('button',{class:'btn btn-mini btn-danger', title:'删除'}, iconSvg('trash'));
   del.addEventListener('click',()=>{ const i=floors.findIndex(x=>x.id===floor.id); if(i>=0){ floors.splice(i,1); buildEditorContentRefresh(); scheduleSave(); } });
   op.appendChild(handle); op.appendChild(numEl); op.appendChild(idInp); op.appendChild(imgBtn); op.appendChild(fileInput); op.appendChild(quoteSel); op.appendChild(opToggle); op.appendChild(up); op.appendChild(down); op.appendChild(del);
   block.appendChild(op);
@@ -1252,7 +1272,7 @@ function buildImageArea(images, onChange, opts){
   if(opts.addBtn){
     const fileInput=el('input',{type:'file', accept:'image/*', multiple:'true', style:'display:none'});
     fileInput.addEventListener('change', async ()=>{ if(fileInput.files.length){ await handleImageFiles(fileInput.files, images); fileInput.value=''; onChange(); } });
-    const addBtn=el('button',{class:'btn btn-ghost btn-mini'}, '+ 图片');
+    const addBtn=el('button',{class:'btn btn-ghost btn-mini'}, iconSvg('plus'), ' 图片');
     addBtn.addEventListener('click',()=> fileInput.click());
     area.appendChild(addBtn);
     area.appendChild(fileInput);
@@ -1730,7 +1750,7 @@ function renderPickup(){
   const app=document.getElementById('app'); app.innerHTML=''; app.classList.add('editor-view');
   const p=state.currentProject;
   const bar=el('div',{class:'topbar'});
-  const back=el('button',{class:'btn btn-ghost'}, '← 返回列表');
+  const back=el('button',{class:'btn btn-ghost'}, iconSvg('back'), ' 返回列表');
   back.addEventListener('click', ()=>{
     if(isDesktop() || state.pickupView==='chatlist'){ goHome(); }
     else { state.pickupView='chatlist'; renderPickup(); }
@@ -1918,7 +1938,7 @@ function buildChatDetailPreview(chat){
 function buildDetailBar(chat, mode){
   const decorative = mode==='preview';
   const bar=el('div',{class:'wx-detail-bar'});
-  const back=el('button',{class:'wx-db-back'}, '←');
+  const back=el('button',{class:'wx-db-back'}, iconSvg('back'));
   if(!decorative) back.addEventListener('click', ()=>{
     if(isDesktop()){ state.activeChatId=null; renderPickup(); }
     else { state.pickupView='chatlist'; renderPickup(); }
@@ -2311,7 +2331,7 @@ function renderChatInfoBody(body, chat, closeFn, isSetup){
     row.appendChild(meBtn);
 
     if(chat.members.length>1){
-      const delBtn=el('button',{class:'btn btn-mini btn-danger'}, '删');
+      const delBtn=el('button',{class:'btn btn-mini btn-danger', title:'删除'}, iconSvg('trash'));
       delBtn.addEventListener('click', ()=>{ chat.members=chat.members.filter(x=>x.id!==m.id); if(chat.members.length && !chat.members.some(x=>x.isMe)) chat.members[0].isMe=true; chat.type=chat.members.length>=3?'group':'single'; scheduleSave(); renderChatInfoBody(body, chat, closeFn, isSetup); refreshChatDetail(); });
       row.appendChild(delBtn);
     }
@@ -2912,12 +2932,31 @@ async function handleRealtimeEvent(payload){
   const localU = local ? (local.updatedAt || 0) : 0;
   const cloudU = cloud.updatedAt || 0;
   if(cloudU > localU + 2000){
-    const ok = await confirmDialog('其他设备更新了「' + (cloud.title || '未命名小说') + '」，是否拉取最新版本？');
+    const ok = await new Promise(resolve=>{
+      const body=el('div',{class:'modal-body'});
+      body.appendChild(el('p',{}, '其他设备更新了「' + (cloud.title||'未命名小说') + '」，是否拉取最新版本？'));
+      const row=el('div',{class:'modal-row modal-actions'});
+      const cancel=el('button',{class:'btn btn-ghost'}, '取消');
+      const okBtn=el('button',{class:'btn btn-primary'}, '确认');
+      row.appendChild(cancel); row.appendChild(okBtn);
+      body.appendChild(row);
+      const closeFn=openModal(body);
+      cancel.addEventListener('click',()=>{ closeFn(); resolve(false); });
+      okBtn.addEventListener('click',()=>{ closeFn(); resolve(true); });
+    });
     if(ok){
-      await idbPut(cloud);
-      state.projects = (state.projects || []).map(p=> p.id===cloud.id ? cloud : p);
-      if(state.currentProject && state.currentProject.id===cloud.id){ state.currentProject = normalizeProject(cloud); }
-      render();
+      const inside = !!(state.currentProject && state.currentProject.id===cloud.id);
+      if(inside){ await goHome(); }           // 若正在该项目内，先弹回列表
+      showSyncSpinner('正在同步中…');
+      try{
+        await idbPut(cloud);
+        state.projects = (state.projects||[]).map(p=> p.id===cloud.id ? cloud : p);
+        if(state.currentProject && state.currentProject.id===cloud.id){ state.currentProject = normalizeProject(cloud); }
+        render();
+        await new Promise(r=>setTimeout(r, 500)); // 确保圈圈可见
+      } finally {
+        hideSyncSpinner();
+      }
     } else if(local){ pushProject(local); }
   } else if(local && cloudU <= localU){ pushProject(local); }
 }
@@ -2946,6 +2985,19 @@ function refreshSyncBar(){
   if(label) label.textContent=text;
   if(nowBtn) nowBtn.disabled = !state.isOnline;
 }
+
+/* 实时同步中转圈遮罩工具 */
+let __spinnerEl=null;
+function showSyncSpinner(text){
+  hideSyncSpinner();
+  const overlay=el('div',{class:'sync-spinner-overlay', id:'sync-spinner'});
+  overlay.appendChild(el('div',{class:'sync-spinner'}));
+  overlay.appendChild(el('div',{class:'sync-spinner-text'}, text||'正在同步中…'));
+  document.body.appendChild(overlay);
+  __spinnerEl=overlay;
+}
+function hideSyncSpinner(){ if(__spinnerEl){ __spinnerEl.remove(); __spinnerEl=null; } }
+
 /* ===== Account: 首页常驻头像按钮 + 账号管理面板（v1，localStorage 存储） ===== */
 const __ACCOUNT_PROFILE_KEY = 'fn_account_profile';
 let __accountPanelSync = null; /* 打开面板时持有同步状态行的实时刷新句柄 */
@@ -3101,7 +3153,7 @@ function openAccountPanel(){
   const syncDot = el('span', { class:'account-sync-dot' });
   const syncText = el('span', { class:'account-sync-text' }, syncStatusText());
   syncStatus.appendChild(syncDot); syncStatus.appendChild(syncText);
-  const syncBtn = el('button', { class:'btn btn-ghost' }, '☁ 立即同步');
+  const syncBtn = el('button', { class:'btn btn-ghost' }, iconSvg('cloud'), ' 立即同步');
   syncBtn.disabled = !state.isOnline || !state.userId;
   syncBtn.addEventListener('click', ()=>{
     if(!state.isOnline || !state.userId){ toast('请联网并登录后再同步'); return; }
