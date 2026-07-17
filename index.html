@@ -489,6 +489,18 @@
  * 作者：寇豆码 (Alex)
  * ============================================================ */
 
+/* ---------- 可见错误浮层（永不白屏） ---------- */
+function showFatal(msg){
+  try{
+    const box = document.createElement('div');
+    box.style.cssText = 'position:fixed;left:0;right:0;top:0;z-index:99999;background:#fff3f3;color:#b3261e;border-bottom:1px solid #f3c2c4;padding:14px 18px;font:14px/1.6 system-ui,sans-serif;white-space:pre-wrap;';
+    box.textContent = '⚠️ 页面运行出错（请截图发给开发者）：\n' + msg;
+    (document.body || document.documentElement).appendChild(box);
+  }catch(e){ console.error('showFatal failed', e); }
+}
+window.addEventListener('error', (e)=>{ if(e && e.target && e.target !== window) return; showFatal((e && e.message ? e.message : '未知错误') + (e && e.filename ? '\n@ '+e.filename+':'+e.lineno : '')); });
+window.addEventListener('unhandledrejection', (e)=>{ const r=e && e.reason; showFatal('未处理的 Promise 拒绝：\n' + ((r && (r.stack||r.message)) || String(r))); });
+
 /* ---------- 小工具 ---------- */
 function uid(){ return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c=>{
   const r=Math.random()*16|0; const v=c==='x'?r:(r&0x3|0x8); return v.toString(16);}); }
@@ -672,32 +684,44 @@ function makePasteHandler(images, onChange){
   };
 }
 
+/* ---------- 存储兜底：IndexedDB 不可用 → 内存模式 ---------- */
+const __memStore = new Map();
+let __usingMemory = false;
+function __memAll(){ return [...__memStore.values()]; }
+
 /* ---------- IndexedDB ---------- */
 function openDB(){
   return new Promise((res,rej)=>{
-    const req=indexedDB.open('forum-novel-db',1);
-    req.onupgradeneeded=()=>{ req.result.createObjectStore('projects',{keyPath:'id'}); };
-    req.onsuccess=()=>res(req.result);
-    req.onerror=()=>rej(req.error);
+    try{
+      if(typeof indexedDB === 'undefined'){ __usingMemory = true; return res(null); }
+      const req = indexedDB.open('forum-novel-db', 1);
+      req.onupgradeneeded = ()=>{ try{ req.result.createObjectStore('projects',{keyPath:'id'}); }catch(e){} };
+      req.onsuccess = ()=> res(req.result);
+      req.onerror = ()=>{ __usingMemory = true; res(null); };   // 降级而非 reject
+    }catch(e){ __usingMemory = true; res(null); }
   });
 }
 async function idbGetAll(){
-  const db=await openDB();
+  if(__usingMemory) return __memAll();
+  const db=await openDB(); if(!db) return [];
   return new Promise((res,rej)=>{ const tx=db.transaction('projects','readonly');
     const r=tx.objectStore('projects').getAll(); r.onsuccess=()=>res(r.result||[]); r.onerror=()=>rej(r.error); });
 }
 async function idbGet(id){
-  const db=await openDB();
+  if(__usingMemory) return __memStore.get(id)||null;
+  const db=await openDB(); if(!db) return null;
   return new Promise((res,rej)=>{ const tx=db.transaction('projects','readonly');
     const r=tx.objectStore('projects').get(id); r.onsuccess=()=>res(r.result||null); r.onerror=()=>rej(r.error); });
 }
 async function idbPut(project){
-  const db=await openDB();
+  if(__usingMemory){ __memStore.set(project.id, project); return; }
+  const db=await openDB(); if(!db) return;
   return new Promise((res,rej)=>{ const tx=db.transaction('projects','readwrite');
     tx.objectStore('projects').put(project); tx.oncomplete=()=>res(); tx.onerror=()=>rej(tx.error); });
 }
 async function idbDelete(id){
-  const db=await openDB();
+  if(__usingMemory){ __memStore.delete(id); return; }
+  const db=await openDB(); if(!db) return;
   return new Promise((res,rej)=>{ const tx=db.transaction('projects','readwrite');
     tx.objectStore('projects').delete(id); tx.oncomplete=()=>res(); tx.onerror=()=>rej(tx.error); });
 }
@@ -2679,12 +2703,18 @@ function loadEmbedded(){
   return true;
 }
 async function init(){
-  if(loadEmbedded()){ render(); return; }
-  try{ state.projects=await idbGetAll(); }catch(e){ state.projects=[]; console.warn('db load failed', e); }
-  state.projects.sort((a,b)=>b.updatedAt-a.updatedAt);
-  state.view='home';
-  render();
-  window.addEventListener('resize', ()=> applyModeVisibility());
+  try{
+    if(loadEmbedded()){ render(); return; }
+    try{ state.projects=await idbGetAll(); }catch(e){ state.projects=[]; console.warn('db load failed', e); }
+    state.projects.sort((a,b)=>b.updatedAt-a.updatedAt);
+    state.view='home';
+    render();
+    if(__usingMemory && typeof toast==='function') toast('当前为内存模式（本地存储不可用，刷新后数据会丢失）。建议用 Chrome 打开或部署到 https 站点。');
+    window.addEventListener('resize', ()=> applyModeVisibility());
+  }catch(e){
+    console.error('init failed', e);
+    showFatal('初始化失败：\n' + ((e && (e.stack||e.message)) || String(e)));
+  }
 }
 if(document.readyState!=='loading') init().then(()=> initSync());
 else document.addEventListener('DOMContentLoaded', () => { init().then(() => initSync()); });
