@@ -201,6 +201,8 @@
   .home-header{display:flex; align-items:center; justify-content:space-between; gap:12px; padding:20px 16px; flex-wrap:wrap;}
   .home-header h1{font-size:22px; margin:0;}
   .home-actions{display:flex; gap:10px;}
+  .home-filter{display:flex; align-items:center;}
+  .home-filter select{min-width:96px;}
   .empty{text-align:center; color:var(--muted); padding:60px 16px; font-size:15px;}
   .card-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:14px; padding:0 16px 30px;}
   .proj-card{background:#fff; border:1px solid var(--border); border-radius:14px; overflow:hidden; cursor:pointer;
@@ -224,7 +226,11 @@
   .tcp-bubble{background:#fff; border-radius:8px; padding:8px 10px; font-size:13px;
     line-height:1.4; color:#333; max-height:56px; overflow:hidden; position:relative; box-shadow:0 1px 2px rgba(0,0,0,.06);}
   .proj-meta{padding:10px 12px;}
-  .proj-title{font-size:15px; font-weight:600; color:#1f2329; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .proj-title{font-size:16px; font-weight:700; color:#1f2329; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .proj-title-row{display:flex; align-items:center; justify-content:space-between; gap:8px;}
+  .proj-type-tag{font-size:11px; line-height:18px; padding:2px 8px; border-radius:999px; white-space:nowrap; flex-shrink:0;}
+  .proj-type-tag.forum{background:#e8f4ff; color:#2a7ac8;}
+  .proj-type-tag.pickup{background:#e8f9e8; color:#2a8a2a;}
   .proj-sub{font-size:12px; color:var(--muted); margin-top:3px;}
   .proj-acts{display:flex; gap:8px; padding:0 12px 12px;}
   .proj-acts .btn-mini{flex:1;}
@@ -787,6 +793,16 @@ function renderHome(){
   const app=document.getElementById('app'); app.innerHTML=''; app.classList.remove('editor-view');
   const header=el('div',{class:'home-header'});
   header.appendChild(el('h1',{}, '我的作品'));
+  const filterWrap=el('div',{class:'home-filter'});
+  const filterSel=el('select',{class:'inp inp-sm'});
+  [['all','全部作品'],['forum','论坛体'],['pickup','聊天体']].forEach(([v,t])=>{
+    const o=el('option',{value:v}, t);
+    if((state.homeFilter||'all')===v) o.selected=true;
+    filterSel.appendChild(o);
+  });
+  filterSel.addEventListener('change',()=>{ state.homeFilter=filterSel.value; renderHome(); });
+  filterWrap.appendChild(filterSel);
+  header.appendChild(filterWrap);
   const actions=el('div',{class:'home-actions'});
   const newBtn=el('button',{class:'btn btn-primary'}, iconSvg('plus'), ' 新建作品');
   newBtn.addEventListener('click', openNewProjectModal);
@@ -801,7 +817,10 @@ function renderHome(){
     return;
   }
   const grid=el('div',{class:'card-grid'});
-  state.projects.forEach(p=> grid.appendChild(buildHomeCard(p)));
+  const homeFilter=state.homeFilter||'all';
+  state.projects.forEach(p=>{
+    if(homeFilter==='all' || p.type===homeFilter) grid.appendChild(buildHomeCard(p));
+  });
   app.appendChild(grid);
 }
 
@@ -821,7 +840,11 @@ function buildHomeCard(p){
   card.appendChild(thumb);
 
   const meta=el('div',{class:'proj-meta'});
-  meta.appendChild(el('div',{class:'proj-title'}, p.title||'未命名小说'));
+  const titleRow=el('div',{class:'proj-title-row'});
+  titleRow.appendChild(el('div',{class:'proj-title'}, p.title||'未命名小说'));
+  const tag=el('span',{class:'proj-type-tag '+(p.type==='pickup'?'pickup':'forum')}, p.type==='pickup'?'聊天体':'论坛体');
+  titleRow.appendChild(tag);
+  meta.appendChild(titleRow);
   const sub = isPickup
     ? ((p.data.chats?p.data.chats.length:0)+' 个聊天 · '+formatDate(p.updatedAt))
     : ((p.data.floors?p.data.floors.length:0)+' 层 · '+formatDate(p.updatedAt));
