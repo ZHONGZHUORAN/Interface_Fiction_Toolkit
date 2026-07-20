@@ -201,8 +201,6 @@
   .home-header{display:flex; align-items:center; justify-content:space-between; gap:12px; padding:20px 16px; flex-wrap:wrap;}
   .home-header h1{font-size:22px; margin:0;}
   .home-actions{display:flex; gap:10px;}
-  .home-filter{display:flex; align-items:center;}
-  .home-filter select{min-width:96px;}
   .empty{text-align:center; color:var(--muted); padding:60px 16px; font-size:15px;}
   .card-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:14px; padding:0 16px 30px;}
   .proj-card{background:#fff; border:1px solid var(--border); border-radius:14px; overflow:hidden; cursor:pointer;
@@ -793,16 +791,6 @@ function renderHome(){
   const app=document.getElementById('app'); app.innerHTML=''; app.classList.remove('editor-view');
   const header=el('div',{class:'home-header'});
   header.appendChild(el('h1',{}, '我的作品'));
-  const filterWrap=el('div',{class:'home-filter'});
-  const filterSel=el('select',{class:'inp inp-sm'});
-  [['all','全部作品'],['forum','论坛体'],['pickup','聊天体']].forEach(([v,t])=>{
-    const o=el('option',{value:v}, t);
-    if((state.homeFilter||'all')===v) o.selected=true;
-    filterSel.appendChild(o);
-  });
-  filterSel.addEventListener('change',()=>{ state.homeFilter=filterSel.value; renderHome(); });
-  filterWrap.appendChild(filterSel);
-  header.appendChild(filterWrap);
   const actions=el('div',{class:'home-actions'});
   const newBtn=el('button',{class:'btn btn-primary'}, iconSvg('plus'), ' 新建作品');
   newBtn.addEventListener('click', openNewProjectModal);
@@ -817,9 +805,8 @@ function renderHome(){
     return;
   }
   const grid=el('div',{class:'card-grid'});
-  const homeFilter=state.homeFilter||'all';
   state.projects.forEach(p=>{
-    if(homeFilter==='all' || p.type===homeFilter) grid.appendChild(buildHomeCard(p));
+    grid.appendChild(buildHomeCard(p));
   });
   app.appendChild(grid);
 }
