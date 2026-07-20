@@ -345,12 +345,9 @@
     content:''; position:absolute; top:12px; left:-7px; width:0; height:0;
     border-top:6px solid transparent; border-bottom:6px solid transparent; border-right:8px solid #fff; }
   .wx-bubble.withdrawn{ opacity:0.55; }
-  .wx-bubble.me.blocked::after{
-    content:'!'; position:absolute; left:-5px; top:50%; transform:translateY(-50%); width:16px; height:16px; border-radius:50%;
-    background:#fa5151; color:#fff; font-size:12px; font-weight:700; line-height:16px; text-align:center; }
-  .wx-bubble.other.blocked::after{
-    content:'!'; position:absolute; right:-5px; top:50%; transform:translateY(-50%); width:16px; height:16px; border-radius:50%;
-    background:#fa5151; color:#fff; font-size:12px; font-weight:700; line-height:16px; text-align:center; }
+  .wx-status-badge{ display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; min-width:18px; }
+  .wx-status-icon{ width:16px; height:16px; border-radius:50%; background:#fa5151; color:#fff; font-size:12px; font-weight:700; line-height:16px; text-align:center; }
+  .wx-status-label{ font-size:10px; color:#b3b3b3; background:#f5f5f5; border-radius:4px; padding:2px 4px; white-space:nowrap; }
   .wx-rejected-tip{ text-align:center; font-size:12px; color:#b3b3b3; margin:4px 0 8px; padding:0 16px; }
 
   /* 语音气泡 */
@@ -750,7 +747,12 @@ const state={ view:'home', projects:[], currentProject:null, mode:'edit', isEmbe
   voiceDuration:null,      // 语音秒数（弹窗填写）
   pendingImages:[],        // 待发送图片（{id,dataUrl,name}[]）
   pendingQuote:null,       // 引用中的 {messageId, snippet}
-  memberChatId:null        // 打开成员管理弹窗时指向的 chat
+  memberChatId:null,       // 打开成员管理弹窗时指向的 chat
+  /* —— 同步窗抑制字段（修复聊天体反复弹窗死循环） —— */
+  __ownPushes:null,        // Map<id, updated_at ISO> 本页刚推送的标记
+  __syncModalOpen:false,   // 是否有同步窗正在显示
+  __syncModalId:null,      // 正在显示的同步窗对应的项目 id
+  __syncResolved:{}        // {id: timestamp} 最近一次处理过同步冲突的时间，用于 30s 抑制
 };
 
 function scheduleSave(){
@@ -2055,8 +2057,20 @@ function buildMessageBubble(msg, ctx){
   if(sender && sender.avatar && sender.avatar.dataUrl) avatar.appendChild(el('img',{class:'wx-avatar-img', src:sender.avatar.dataUrl, alt:''}));
   else avatar.appendChild(el('span',{class:'wx-avatar-ph'}, (sender?(sender.name||'?'):'?').slice(0,1)));
 
-  if(isMe){ row.appendChild(bubbleCol); row.appendChild(avatar); }
-  else { row.appendChild(avatar); row.appendChild(bubbleCol); }
+  // 状态徽标（真实 DOM，避免伪元素定位错位）：拉黑红圆感叹号 / 撤回灰色标签
+  let statusBadge=null;
+  if(msg.blocked || msg.withdrawn){
+    statusBadge=el('div',{class:'wx-status-badge'});
+    if(msg.blocked) statusBadge.appendChild(el('div',{class:'wx-status-icon'}, '!'));
+    if(msg.withdrawn) statusBadge.appendChild(el('div',{class:'wx-status-label'}, '已撤回'));
+  }
+  if(isMe){
+    if(statusBadge) row.appendChild(statusBadge);
+    row.appendChild(bubbleCol); row.appendChild(avatar);
+  } else {
+    row.appendChild(avatar); row.appendChild(bubbleCol);
+    if(statusBadge) row.appendChild(statusBadge);
+  }
 
   if(!readonly){
     row.addEventListener('contextmenu',(e)=>{ e.preventDefault(); ctx.onOp(msg); });
@@ -2852,7 +2866,7 @@ async function pushProject(p){
   OfflineQueue.remove(p.id);
   // 标记这是本页面自己刚推送的项目，Realtime 把同一事件推回来时忽略，避免误弹"其他设备更新"窗。
   state.__ownPushes = state.__ownPushes || new Map();
-  state.__ownPushes.set(p.id, p.updatedAt || Date.now());
+  state.__ownPushes.set(p.id, new Date(p.updatedAt || Date.now()).toISOString()); // 记录写入库的 updated_at ISO，与回环事件可精确比较
   return true;
 }
 async function deleteProject(id){
@@ -2992,18 +3006,19 @@ async function handleRealtimeEvent(payload){
   if(ev==='UPDATE' || ev==='INSERT'){
     const newRow = payload.new;
     if(newRow && newRow.id && newRow.updated_at){
+      const ownTag = state.__ownPushes && state.__ownPushes.get(newRow.id);
+      // 精确匹配：库回传的 updated_at 等于我们刚写入的标记，必是自己的回环事件
+      if(ownTag && ownTag === newRow.updated_at) return;
+      // 时间差兜底（兼容服务器重写 updated_at 但时钟接近的情况），扩大到 30s
       const cloudU = Date.parse(newRow.updated_at);
-      const ownTs = state.__ownPushes && state.__ownPushes.get(newRow.id);
-      if(ownTs && Math.abs(cloudU - ownTs) <= 2000){
-        // 自己刚推的，不弹窗、不覆盖，直接忽略。
-        return;
-      }
+      const ownTs = ownTag ? Date.parse(ownTag) : 0;
+      if(ownTs && Math.abs(cloudU - ownTs) <= 30000) return;
     }
   }
   // 清理 5 分钟前的 ownPush 记录
   if(state.__ownPushes){
     const now = Date.now();
-    for(const [id, ts] of state.__ownPushes){ if(now - ts > 5*60*1000) state.__ownPushes.delete(id); }
+    for(const [id, ts] of state.__ownPushes){ if(now - Date.parse(ts) > 5*60*1000) state.__ownPushes.delete(id); }
   }
   if(ev==='DELETE'){
     const id = (payload.old && payload.old.id) || null;
@@ -3028,7 +3043,16 @@ async function handleRealtimeEvent(payload){
   const localU = local ? (local.updatedAt || 0) : 0;
   const cloudU = cloud.updatedAt || 0;
   if(cloudU > localU + 2000){
+    // 决策抑制：30s 内同一项目已处理过同步冲突，则不再弹窗，直接本地优先推送
+    const lastResolved = state.__syncResolved[cloud.id] || 0;
+    if(Date.now() - lastResolved < 30000){
+      if(local) pushProject(local);
+      return;
+    }
+    // 弹窗抑制锁：已有同项目同步窗在显示，不叠加
+    if(state.__syncModalOpen && state.__syncModalId===cloud.id){ return; }
     const ok = await new Promise(resolve=>{
+      state.__syncModalOpen = true; state.__syncModalId = cloud.id;
       const body=el('div',{class:'modal-body'});
       body.appendChild(el('p',{}, '其他设备更新了「' + (cloud.title||'未命名小说') + '」，是否拉取最新版本？'));
       const row=el('div',{class:'modal-row modal-actions'});
@@ -3037,8 +3061,9 @@ async function handleRealtimeEvent(payload){
       row.appendChild(cancel); row.appendChild(okBtn);
       body.appendChild(row);
       const closeFn=openModal(body);
-      cancel.addEventListener('click',()=>{ closeFn(); resolve(false); });
-      okBtn.addEventListener('click',()=>{ closeFn(); resolve(true); });
+      const done=(v)=>{ state.__syncModalOpen=false; state.__syncModalId=null; closeFn(); resolve(v); };
+      cancel.addEventListener('click',()=>{ state.__syncResolved[cloud.id]=Date.now(); done(false); });
+      okBtn.addEventListener('click',()=>{ state.__syncResolved[cloud.id]=Date.now(); done(true); });
     });
     if(ok){
       const inside = !!(state.currentProject && state.currentProject.id===cloud.id);
