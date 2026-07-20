@@ -83,6 +83,13 @@
   .set-row{display:flex; align-items:center; justify-content:space-between; gap:12px; font-size:14px;}
   .set-row > span{ white-space:nowrap; flex-shrink:0; }
   .set-row > div{ flex:1; min-width:0; display:flex; align-items:center; justify-content:flex-end; }
+  /* 封面图上传：横排 + icon 按钮 */
+  .cover-upload-row{ display:flex; align-items:center; gap:8px; }
+  .cover-upload-row > span{ font-size:13px; color:var(--muted); white-space:nowrap; }
+  .cover-upload-row > input[type="file"]{ display:none; }
+  .cover-upload-btn{ display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px; padding:0; border-radius:6px; border:1px solid #e5e6eb; background:#fff; color:#444; cursor:pointer; }
+  .cover-upload-btn:hover{ background:#f5f5f5; }
+  .cover-upload-btn .icon-svg svg{ width:16px; height:16px; }
 
   /* 封面顶部：标签 + 圆 + 楼主 id 同行 */
   .cover-top{display:flex; align-items:center; gap:10px; margin-bottom:8px;}
@@ -550,7 +557,8 @@ const ICON_SVG = {
   down: '<svg viewBox="0 0 1048 1024" xmlns="http://www.w3.org/2000/svg" style="transform:scaleY(-1)"><path d="M565.514 273.221c0.393 0.394 0.491 0.935 0.861 1.326l431.062 392.233c23.201 23.692 23.471 61.883 0.566 85.254-22.906 23.374-60.284 23.126-83.511-0.589l-390.168-355.025-390.933 355.739c-23.224 23.691-60.826 23.716-84.025 0.049-23.174-23.692-23.151-62.079 0.049-85.795l432.096-393.168c23.199-23.692 60.827-23.716 84.001-0.024z" fill="#272536"/></svg>',
   plus: '<svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg"><path d="M224 464h576a48 48 0 0 1 0 96h-576a48 48 0 0 1 0-96z" fill="currentColor"/><path d="M560 224v576a48 48 0 0 1-96 0v-576a48 48 0 0 1 96 0z" fill="currentColor"/></svg>',
   cloud: '<svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg"><path d="M746.666667 725.333333c59.733333-12.8 106.666667-64 106.666666-128 0-72.533333-55.466667-128-128-128-17.066667 0-29.866667 4.266667-42.666666 8.533334V469.333333c0-93.866667-76.8-170.666667-170.666667-170.666666s-170.666667 76.8-170.666667 170.666666c0 17.066667 4.266667 29.866667 4.266667 46.933334-8.533333-4.266667-17.066667-4.266667-25.6-4.266667C260.266667 512 213.333333 558.933333 213.333333 618.666667S260.266667 725.333333 320 725.333333h426.666667z m0 85.333334h-426.666667C213.333333 810.666667 128 725.333333 128 618.666667c0-85.333333 55.466667-157.866667 128-183.466667C273.066667 311.466667 379.733333 213.333333 512 213.333333c110.933333 0 209.066667 72.533333 243.2 170.666667 127.466667 0 192 102.4 192 213.333333s-85.333333 200.533333-192 213.333334z" fill="#444444"/></svg>',
-  trash: '<svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg"><path d="M799.2 874.4c0 34.4-28.001 62.4-62.4 62.4H287.2c-34.4 0-62.4-28-62.4-62.4V212h574.4v662.4zM349.6 100c0-7.2 5.6-12.8 12.8-12.8h300c7.2 0 12.8 5.6 12.8 12.8v37.6H349.6V100z m636.8 37.6H749.6V100c0-48.001-39.2-87.2-87.2-87.2h-300c-48 0-87.2 39.199-87.2 87.2v37.6H37.6C16.8 137.6 0 154.4 0 175.2s16.8 37.6 37.6 37.6h112v661.6c0 76 61.6 137.6 137.6 137.6h449.6c76 0 137.6-61.6 137.6-137.6V212h112c20.8 0 37.6-16.8 37.6-37.6s-16.8-36.8-37.6-36.8zM512 824c20.8 0 37.6-16.8 37.6-37.6v-400c0-20.8-16.8-37.6-37.6-37.6s-37.6 16.8-37.6 37.6v400c0 20.8 16.8 37.6 37.6 37.6m-175.2 0c20.8 0 37.6-16.8 37.6-37.6v-400c0-20.8-16.8-37.6-37.6-37.6s-37.6 16.8-37.6 37.6v400c0.8 20.8 17.6 37.6 37.6 37.6m350.4 0c20.8 0 37.6-16.8 37.6-37.6v-400c0-20.8-16.8-37.6-37.6-37.6s-37.6 16.8-37.6 37.6v400c0 20.8 16.8 37.6 37.6 37.6" fill="currentColor"/></svg>'
+  trash: '<svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg"><path d="M799.2 874.4c0 34.4-28.001 62.4-62.4 62.4H287.2c-34.4 0-62.4-28-62.4-62.4V212h574.4v662.4zM349.6 100c0-7.2 5.6-12.8 12.8-12.8h300c7.2 0 12.8 5.6 12.8 12.8v37.6H349.6V100z m636.8 37.6H749.6V100c0-48.001-39.2-87.2-87.2-87.2h-300c-48 0-87.2 39.199-87.2 87.2v37.6H37.6C16.8 137.6 0 154.4 0 175.2s16.8 37.6 37.6 37.6h112v661.6c0 76 61.6 137.6 137.6 137.6h449.6c76 0 137.6-61.6 137.6-137.6V212h112c20.8 0 37.6-16.8 37.6-37.6s-16.8-36.8-37.6-36.8zM512 824c20.8 0 37.6-16.8 37.6-37.6v-400c0-20.8-16.8-37.6-37.6-37.6s-37.6 16.8-37.6 37.6v400c0 20.8 16.8 37.6 37.6 37.6m-175.2 0c20.8 0 37.6-16.8 37.6-37.6v-400c0-20.8-16.8-37.6-37.6-37.6s-37.6 16.8-37.6 37.6v400c0.8 20.8 17.6 37.6 37.6 37.6m350.4 0c20.8 0 37.6-16.8 37.6-37.6v-400c0-20.8-16.8-37.6-37.6-37.6s-37.6 16.8-37.6 37.6v400c0 20.8 16.8 37.6 37.6 37.6" fill="currentColor"/></svg>',
+  upload: '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><polyline points="17 8 12 3 7 8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><line x1="12" y1="3" x2="12" y2="15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>'
 };
 function iconSvg(type){ return el('span', { class:'icon-svg', html: ICON_SVG[type] || '' }); }
 
@@ -1075,9 +1083,13 @@ function buildSettings(){
       const files=[...(coverFile.files||[])].filter(f=>f&&f.type&&f.type.startsWith('image/'));
       if(files.length){ const url=await fileToDataURL(files[0]); data.coverImage={id:uid(), dataUrl:url, name:files[0].name||'cover'}; coverFile.value=''; scheduleSave(); renderEditor(); }
     });
-    const fileLabel = el('span',{style:'font-size:13px;color:var(--muted);margin-right:8px;'}, '上传封面图');
-    coverRight.appendChild(fileLabel);
-    coverRight.appendChild(coverFile);
+    const uploadRow = el('div',{class:'cover-upload-row'});
+    const uploadBtn = el('button',{class:'cover-upload-btn', title:'上传封面图', type:'button'}, iconSvg('upload'));
+    uploadBtn.addEventListener('click', ()=> coverFile.click());
+    uploadRow.appendChild(el('span',{}, '上传封面图'));
+    uploadRow.appendChild(uploadBtn);
+    uploadRow.appendChild(coverFile);
+    coverRight.appendChild(uploadRow);
   }
   row3.appendChild(coverRight);
   body.appendChild(row3);
@@ -1106,9 +1118,13 @@ function buildPickupSettings(){
       const files=[...(file.files||[])].filter(f=>f&&f.type&&f.type.startsWith('image/'));
       if(files.length){ const url=await fileToDataURL(files[0]); data.coverImage={id:uid(), dataUrl:url, name:files[0].name||'cover'}; file.value=''; scheduleSave(); renderPickup(); }
     });
-    const fileLabel = el('span',{style:'font-size:13px;color:var(--muted);margin-right:8px;'}, '上传封面图');
-    right.appendChild(fileLabel);
-    right.appendChild(file);
+    const uploadRow = el('div',{class:'cover-upload-row'});
+    const uploadBtn = el('button',{class:'cover-upload-btn', title:'上传封面图', type:'button'}, iconSvg('upload'));
+    uploadBtn.addEventListener('click', ()=> file.click());
+    uploadRow.appendChild(el('span',{}, '上传封面图'));
+    uploadRow.appendChild(uploadBtn);
+    uploadRow.appendChild(file);
+    right.appendChild(uploadRow);
   }
   row.appendChild(right);
   body.appendChild(row);
